@@ -1,0 +1,76 @@
+import json
+import xml.etree.ElementTree as ET
+from typing import List, Dict
+
+def parse_movies_txt(file_path: str) -> List[Dict]:
+    movies = []
+    with open(file_path, 'r', encoding='utf-8') as f:
+        lines = [line.strip() for line in f if line.strip()]
+    
+    i = 0
+    while i < len(lines):
+        movie = {}
+        directors = []
+        while i < len(lines) and not lines[i].startswith("Title:"):
+            i += 1
+        if i >= len(lines):
+            break
+        movie["Title"] = lines[i].split(":", 1)[1].strip()
+        i += 1
+        while i < len(lines) and not lines[i].startswith("Title:"):
+            if lines[i].startswith("Genre:"):
+                movie["Genre"] = lines[i].split(":", 1)[1].strip()
+            elif lines[i].startswith("Director Name:"):
+                directors.append({"Name": lines[i].split(":", 1)[1].strip()})
+            elif lines[i].startswith("Studio:"):
+                movie["Studio"] = lines[i].split(":", 1)[1].strip()
+            elif lines[i].startswith("Year:"):
+                movie["Year"] = int(lines[i].split(":", 1)[1].strip())
+            i += 1
+        movie["Director"] = directors
+        movies.append({"Movie": movie})
+    return movies
+
+def sort_movies(movies: List[Dict], key: str) -> List[Dict]:
+    def get_sort_value(movie_dict):
+        movie = movie_dict["Movie"]
+        if key == "Director":
+            return movie.get("Director", [{}])[0].get("Name", "")
+        return movie.get(key, "")
+    
+    return sorted(movies, key=get_sort_value)
+
+def generate_xml(movies: List[Dict], output_file: str):
+    root = ET.Element("Movies")
+    for movie_dict in movies:
+        movie = movie_dict["Movie"]
+        movie_elem = ET.SubElement(root, "Movie")
+        ET.SubElement(movie_elem, "Title").text = movie.get("Title", "")
+        ET.SubElement(movie_elem, "Genre").text = movie.get("Genre", "")
+        directors = movie.get("Director", [])
+        for d in directors:
+            ET.SubElement(movie_elem, "Director").text = d.get("Name", "")
+        ET.SubElement(movie_elem, "Studio").text = movie.get("Studio", "")
+        ET.SubElement(movie_elem, "Year").text = str(movie.get("Year", ""))
+    tree = ET.ElementTree(root)
+    ET.indent(tree, space="  ")
+    tree.write(output_file, encoding='utf-8', xml_declaration=True)
+
+def main():
+    # 1. Parse Movies.txt
+    movies = parse_movies_txt("Movies.txt")
+
+    # 2. Save to Movies.json
+    with open("Movies.json", "w", encoding='utf-8') as f:
+        json.dump(movies, f, indent=2, ensure_ascii=False)
+
+    # 3. Sort by Title
+    sorted_movies = sort_movies(movies, "Title")
+    with open("MoviesSorted.json", "w", encoding='utf-8') as f:
+        json.dump(sorted_movies, f, indent=2, ensure_ascii=False)
+
+    # 4. Generate XML
+    generate_xml(sorted_movies, "Movies.xml")
+
+if __name__ == "__main__":
+    main()
